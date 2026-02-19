@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, ChangeDetectorRef } from '@angular/core';
+import { trigger, transition, style, animate } from '@angular/animations';
 import { CommonModule } from '@angular/common';
 import { ChartConfiguration } from 'chart.js';
 import { StatCardComponent } from '../../shared/components/stat-card/stat-card.component';
@@ -14,12 +15,20 @@ import { combineLatest, take } from 'rxjs';
     selector: 'app-dashboard',
     standalone: true,
     imports: [CommonModule, StatCardComponent, ChartCardComponent, DataTableComponent],
+    animations: [
+        trigger('pageEntrance', [
+            transition(':enter', [
+                style({ opacity: 0, transform: 'translateY(10px)' }),
+                animate('400ms ease-out', style({ opacity: 1, transform: 'translateY(0)' }))
+            ])
+        ])
+    ],
     template: `
-    <div class="space-y-6">
+    <div @pageEntrance class="space-y-8">
       <!-- Page Header -->
       <div>
         <h1 class="text-3xl font-bold text-secondary-900">Dashboard</h1>
-        <p class="text-secondary-600 mt-1">Welcome back! Here's what's happening with your partners.</p>
+        <p class="text-secondary-600 mt-1">Welcome back to Partnerly! Here's what's happening today.</p>
       </div>
       
       <!-- KPI Cards -->
@@ -28,8 +37,8 @@ import { combineLatest, take } from 'rxjs';
           title="Total Partners"
           [value]="stats.totalPartners"
           change="+12% from last month"
-          icon="🤝"
-          iconBgClass="bg-primary-100"
+          icon="users"
+          iconBgClass="bg-primary-100/50 text-primary-600"
           [loading]="loading"
         ></app-stat-card>
         
@@ -37,8 +46,8 @@ import { combineLatest, take } from 'rxjs';
           title="Active Campaigns"
           [value]="stats.activeCampaigns"
           change="+8% from last month"
-          icon="📢"
-          iconBgClass="bg-success/10"
+          icon="megaphone"
+          iconBgClass="bg-success/10 text-success"
           [loading]="loading"
         ></app-stat-card>
         
@@ -46,8 +55,8 @@ import { combineLatest, take } from 'rxjs';
           title="Total Revenue"
           [value]="'$' + stats.totalRevenue.toLocaleString()"
           change="+23% from last month"
-          icon="💰"
-          iconBgClass="bg-warning/10"
+          icon="dollar-sign"
+          iconBgClass="bg-warning/10 text-warning-600"
           [loading]="loading"
         ></app-stat-card>
         
@@ -55,8 +64,8 @@ import { combineLatest, take } from 'rxjs';
           title="Conversions"
           [value]="stats.conversions.toLocaleString()"
           change="+15% from last month"
-          icon="📈"
-          iconBgClass="bg-purple-100"
+          icon="trending-up"
+          iconBgClass="bg-purple-100/50 text-purple-600"
           [loading]="loading"
         ></app-stat-card>
       </div>

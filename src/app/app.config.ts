@@ -1,4 +1,4 @@
-import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
+import { ApplicationConfig, provideBrowserGlobalErrorListeners, importProvidersFrom } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { provideAnimations } from '@angular/platform-browser/animations';
 import { initializeApp, provideFirebaseApp, getApp } from '@angular/fire/app';
@@ -7,6 +7,28 @@ import { getFirestore, provideFirestore, initializeFirestore } from '@angular/fi
 
 import { routes } from './app.routes';
 import { environment } from '../environments/environment';
+import {
+  LucideAngularModule,
+  LayoutDashboard,
+  Users,
+  Megaphone,
+  Settings,
+  LogOut,
+  TrendingUp,
+  DollarSign,
+  Plus,
+  Search,
+  Filter,
+  Inbox,
+  Loader2,
+  User,
+  Shield,
+  Info,
+  Mail,
+  Lock,
+  LogIn,
+  UserPlus
+} from 'lucide-angular';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -15,6 +37,29 @@ export const appConfig: ApplicationConfig = {
     provideAnimations(),
     provideFirebaseApp(() => initializeApp(environment.firebase)),
     provideAuth(() => getAuth()),
-    provideFirestore(() => initializeFirestore(getApp(), {}))
+    provideFirestore(() => initializeFirestore(getApp(), {})),
+    importProvidersFrom(
+      LucideAngularModule.pick({
+        LayoutDashboard,
+        Users,
+        Megaphone,
+        Settings,
+        LogOut,
+        TrendingUp,
+        DollarSign,
+        Plus,
+        Search,
+        Filter,
+        Inbox,
+        Loader2,
+        User,
+        Shield,
+        Info,
+        Mail,
+        Lock,
+        LogIn,
+        UserPlus
+      })
+    )
   ]
 };

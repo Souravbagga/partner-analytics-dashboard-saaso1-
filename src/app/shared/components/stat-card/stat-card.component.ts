@@ -1,10 +1,12 @@
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { LucideAngularModule, Users, Megaphone, DollarSign, TrendingUp } from 'lucide-angular';
 
 @Component({
   selector: 'app-stat-card',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, LucideAngularModule],
+  host: { class: 'block' },
   template: `
     <div class="card hover:shadow-md transition-shadow duration-200" [class.animate-pulse]="loading">
       <div class="flex items-center justify-between">
@@ -23,7 +25,7 @@ import { CommonModule } from '@angular/common';
           </ng-template>
         </div>
         <div [ngClass]="iconBgClass" class="w-12 h-12 rounded-lg flex items-center justify-center shrink-0 ml-4">
-          <span class="text-2xl">{{ icon }}</span>
+          <lucide-icon [img]="iconImg" class="w-6 h-6"></lucide-icon>
         </div>
       </div>
     </div>
@@ -34,9 +36,22 @@ export class StatCardComponent {
   @Input() title: string = '';
   @Input() value: string | number = '';
   @Input() change?: string;
-  @Input() icon: string = '📊';
+  @Input() icon: string = 'layout-dashboard';
   @Input() iconBgClass: string = 'bg-primary-100';
   @Input() loading: boolean = false;
+
+  readonly icons = {
+    Users,
+    Megaphone,
+    DollarSign,
+    TrendingUp
+  };
+
+  get iconImg(): any {
+    const iconName = this.icon.replace(/-/g, '').toLowerCase();
+    const entry = Object.entries(this.icons).find(([key]) => key.toLowerCase() === iconName);
+    return entry ? entry[1] : TrendingUp;
+  }
 
   get changeClass(): string {
     if (!this.change) return '';

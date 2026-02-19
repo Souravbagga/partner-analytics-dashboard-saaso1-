@@ -8,6 +8,8 @@ import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { PartnersComponent } from './features/partners/partners.component';
 import { CampaignsComponent } from './features/campaigns/campaigns.component';
 import { SettingsComponent } from './features/settings/settings.component';
+import { PartnerDetailComponent } from './features/partners/partner-detail/partner-detail.component';
+import { CampaignDetailComponent } from './features/campaigns/campaign-detail/campaign-detail.component';
 
 export const routes: Routes = [
     {
@@ -43,8 +45,16 @@ export const routes: Routes = [
                 component: PartnersComponent
             },
             {
+                path: 'partners/:id',
+                component: PartnerDetailComponent
+            },
+            {
                 path: 'campaigns',
                 component: CampaignsComponent
+            },
+            {
+                path: 'campaigns/:id',
+                component: CampaignDetailComponent
             },
             {
                 path: 'settings',

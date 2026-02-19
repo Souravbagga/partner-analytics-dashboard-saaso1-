@@ -1,13 +1,15 @@
 import { Component, Input, OnInit, ViewChild, ElementRef, OnChanges, SimpleChanges, OnDestroy, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
+import { LucideAngularModule, Loader2 } from 'lucide-angular';
 
 Chart.register(...registerables);
 
 @Component({
   selector: 'app-chart-card',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, LucideAngularModule],
+  host: { class: 'block' },
   template: `
     <div class="card relative min-h-[100px]" [class.animate-pulse]="loading">
       <div class="mb-4">
@@ -16,8 +18,9 @@ Chart.register(...registerables);
       </div>
       <div class="relative" [style.height.px]="height">
         <canvas #chartCanvas [class.hidden]="loading"></canvas>
-        <div *ngIf="loading" class="absolute inset-0 flex items-center justify-center">
-          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+        <div *ngIf="loading" class="absolute inset-0 flex flex-col items-center justify-center gap-2">
+          <lucide-icon [img]="icons.Loader2" class="w-8 h-8 animate-spin text-primary-600"></lucide-icon>
+          <span class="text-xs text-secondary-500 font-medium">Loading chart...</span>
         </div>
       </div>
     </div>
@@ -26,6 +29,10 @@ Chart.register(...registerables);
 })
 export class ChartCardComponent implements OnInit, OnChanges, OnDestroy, AfterViewInit {
   @ViewChild('chartCanvas', { static: false }) chartCanvas?: ElementRef<HTMLCanvasElement>;
+
+  readonly icons = {
+    Loader2
+  };
   @Input() title: string = '';
   @Input() subtitle?: string;
   @Input() height: number = 300;
