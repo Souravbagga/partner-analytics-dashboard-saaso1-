@@ -4,14 +4,18 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink, RouterModule } from '@angular/router';
 import { CampaignService } from '../../../core/services/campaign.service';
 import { PartnerService } from '../../../core/services/partner.service';
+import { EventService } from '../../../core/services/event.service';
 import { Campaign, Partner } from '../../../core/models';
 import { LucideAngularModule, ArrowLeft, Mail, Calendar, ExternalLink, Megaphone, TrendingUp, DollarSign, User, AlertCircle } from 'lucide-angular';
 import { StatCardComponent } from '../../../shared/components/stat-card/stat-card.component';
+import { AuthService } from '../../../core/services/auth.service';
+import { FormsModule } from '@angular/forms';
+import { Edit2, X } from 'lucide-angular';
 
 @Component({
   selector: 'app-campaign-detail',
   standalone: true,
-  imports: [CommonModule, RouterModule, LucideAngularModule, StatCardComponent],
+  imports: [CommonModule, RouterModule, LucideAngularModule, StatCardComponent, FormsModule],
   animations: [
     trigger('pageEntrance', [
       transition(':enter', [
@@ -27,10 +31,14 @@ import { StatCardComponent } from '../../../shared/components/stat-card/stat-car
         <a routerLink="/campaigns" class="btn btn-secondary p-2 rounded-lg flex items-center justify-center">
           <lucide-icon [img]="icons.ArrowLeft" class="w-5 h-5"></lucide-icon>
         </a>
-        <div>
+        <div class="flex-1">
           <h1 class="text-3xl font-bold text-secondary-900">{{ campaign?.name || 'Campaign Details' }}</h1>
           <p class="text-secondary-600 mt-1">Deep dive into campaign performance and configuration</p>
         </div>
+        <button *ngIf="campaign" (click)="openEditModal()" class="btn btn-secondary flex items-center gap-2">
+          <lucide-icon [img]="icons.Edit2" class="w-4 h-4"></lucide-icon>
+          <span>Edit Campaign</span>
+        </button>
       </div>
 
       <div *ngIf="loading" class="flex items-center justify-center py-20">
@@ -173,6 +181,18 @@ import { StatCardComponent } from '../../../shared/components/stat-card/stat-car
                 </div>
               </div>
             </div>
+
+            <!-- New: Simulation Action -->
+            <div class="card bg-primary-600 text-white overflow-hidden" *ngIf="campaign.status === 'Active'">
+              <h4 class="text-sm font-bold mb-3">Live Simulation</h4>
+              <p class="text-xs text-primary-100 mb-4">Test your attribution engine by triggering a mock conversion event.</p>
+              <button (click)="simulateEvent()" 
+                      [disabled]="simulating"
+                      class="w-full py-2.5 bg-white text-primary-600 rounded-xl font-bold text-sm hover:bg-primary-50 transition-colors flex items-center justify-center gap-2">
+                <div *ngIf="simulating" class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600"></div>
+                <span>{{ simulating ? 'Processing...' : 'Track Mock Sale' }}</span>
+              </button>
+            </div>
           </div>
         </div>
       </ng-container>
@@ -183,6 +203,68 @@ import { StatCardComponent } from '../../../shared/components/stat-card/stat-car
         <p class="text-secondary-500 mt-2">The campaign you are looking for does not exist or has been removed.</p>
         <a routerLink="/campaigns" class="btn btn-primary mt-6 inline-block">Back to Campaigns</a>
       </div>
+
+      <!-- Edit Campaign Modal -->
+      <div *ngIf="showEditModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-[70] p-4">
+        <div class="card max-w-md w-full">
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-2xl font-bold text-secondary-900">Edit Campaign</h2>
+            <button (click)="showEditModal = false" class="text-secondary-400 hover:text-secondary-600">
+              <lucide-icon [img]="icons.X" class="w-5 h-5"></lucide-icon>
+            </button>
+          </div>
+          
+          <form (ngSubmit)="updateCampaign()" class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-secondary-700 mb-2">Campaign Name</label>
+              <input type="text" [(ngModel)]="editCampaignData.name" name="name" required class="input" />
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-secondary-700 mb-2">Start Date</label>
+                <input type="date" [(ngModel)]="editCampaignData.startDate" name="startDate" required class="input text-sm" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-secondary-700 mb-2">End Date</label>
+                <input type="date" [(ngModel)]="editCampaignData.endDate" name="endDate" required class="input text-sm" />
+              </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-secondary-700 mb-2">Budget</label>
+                <input type="number" [(ngModel)]="editCampaignData.budget" name="budget" required class="input" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-secondary-700 mb-2">Status</label>
+                <select [(ngModel)]="editCampaignData.status" name="status" class="input">
+                  <option value="Active">Active</option>
+                  <option value="Paused">Paused</option>
+                  <option value="Completed">Completed</option>
+                </select>
+              </div>
+            </div>
+            
+            <div *ngIf="authService.isDemo()" class="p-3 bg-warning/10 border border-warning/20 rounded-lg">
+              <p class="text-xs text-warning-700 font-medium">
+                ⚠️ Demo Mode: Changes might not persist.
+              </p>
+            </div>
+
+            <div *ngIf="errorMessage" class="p-3 bg-danger/10 border border-danger/20 rounded-lg">
+              <p class="text-sm text-danger">{{ errorMessage }}</p>
+            </div>
+            
+            <div class="flex gap-3 pt-4">
+              <button type="submit" [disabled]="submitting" class="btn btn-primary flex-1">
+                {{ submitting ? 'Saving...' : 'Save Changes' }}
+              </button>
+              <button type="button" (click)="showEditModal = false" class="btn btn-secondary flex-1">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   `,
   styles: []
@@ -191,11 +273,25 @@ export class CampaignDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private campaignService = inject(CampaignService);
   private partnerService = inject(PartnerService);
+  private eventService = inject(EventService);
+  public authService = inject(AuthService);
   private cdr = inject(ChangeDetectorRef);
 
   campaign?: Campaign;
   partnerName: string = 'Loading...';
   loading = true;
+  showEditModal = false;
+  submitting = false;
+  simulating = false;
+  errorMessage = '';
+
+  editCampaignData: any = {
+    name: '',
+    startDate: '',
+    endDate: '',
+    budget: 0,
+    status: 'Active'
+  };
 
   readonly icons = {
     ArrowLeft,
@@ -206,7 +302,9 @@ export class CampaignDetailComponent implements OnInit {
     TrendingUp,
     DollarSign,
     User,
-    AlertCircle
+    AlertCircle,
+    Edit2,
+    X
   };
 
   get daysActive(): number {
@@ -221,6 +319,61 @@ export class CampaignDetailComponent implements OnInit {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.loadData(id);
+    }
+  }
+
+  openEditModal() {
+    if (!this.campaign) return;
+    this.editCampaignData = {
+      name: this.campaign.name,
+      startDate: this.formatDateForInput(this.campaign.startDate),
+      endDate: this.formatDateForInput(this.campaign.endDate),
+      budget: this.campaign.budget,
+      status: this.campaign.status
+    };
+    this.showEditModal = true;
+  }
+
+  private formatDateForInput(date: any): string {
+    if (!date) return '';
+    const d = new Date(date);
+    return d.toISOString().split('T')[0];
+  }
+
+  async updateCampaign() {
+    if (!this.campaign?.id) return;
+
+    this.errorMessage = '';
+    this.submitting = true;
+    try {
+      const dataToUpdate = {
+        ...this.editCampaignData,
+        startDate: new Date(this.editCampaignData.startDate),
+        endDate: new Date(this.editCampaignData.endDate)
+      };
+      await this.campaignService.updateCampaign(this.campaign.id, dataToUpdate);
+      this.showEditModal = false;
+      this.loadData(this.campaign.id); // Refresh data
+    } catch (error: any) {
+      this.errorMessage = error.message || 'Error updating campaign';
+    } finally {
+      this.submitting = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  async simulateEvent() {
+    if (!this.campaign?.id || !this.campaign?.partnerId) return;
+
+    this.simulating = true;
+    try {
+      await this.eventService.simulateConversion(this.campaign.partnerId, this.campaign.id);
+      // Optional: Add a toast notification here if available
+    } catch (error) {
+      console.error('Error simulating event:', error);
+    } finally {
+      this.simulating = false;
+      this.cdr.detectChanges();
     }
   }
 

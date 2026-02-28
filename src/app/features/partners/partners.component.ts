@@ -7,7 +7,7 @@ import { DataTableComponent, TableColumn } from '../../shared/components/data-ta
 import { PartnerService } from '../../core/services/partner.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Partner } from '../../core/models';
-import { LucideAngularModule, Plus, Search, Filter, X, Mail, Calendar, User, ExternalLink, Trash2 } from 'lucide-angular';
+import { LucideAngularModule, Plus, Search, Filter, X, Mail, Calendar, User, ExternalLink, Trash2, Clipboard, Check } from 'lucide-angular';
 
 @Component({
   selector: 'app-partners',
@@ -47,36 +47,16 @@ import { LucideAngularModule, Plus, Search, Filter, X, Mail, Calendar, User, Ext
           <h1 class="text-3xl font-bold text-secondary-900">Partners</h1>
           <p class="text-secondary-600 mt-1">Manage your partner relationships</p>
         </div>
-        <button (click)="showAddModal = true" class="btn btn-primary flex items-center gap-2 px-6">
+        <button *ngIf="authService.currentUserProfile$ | async as profile" 
+                [hidden]="profile.role !== 'Admin'"
+                (click)="showAddModal = true" 
+                class="btn btn-primary flex items-center gap-2 px-6">
           <lucide-icon [img]="icons.Plus" class="w-5 h-5"></lucide-icon>
           <span>Add Partner</span>
         </button>
       </div>
       
-      <!-- Search Bar -->
-      <div class="card">
-        <div class="flex items-center gap-4">
-          <div class="flex-1 relative">
-            <lucide-icon [img]="icons.Search" class="absolute left-2 top-1/2 -translate-y-1/2 text-secondary-400 w-5 h-5"></lucide-icon>
-            <input
-              type="text"
-              [(ngModel)]="searchQuery"
-              (ngModelChange)="filterPartners()"
-              placeholder="Search partners by name or email..."
-              class="input pl-10"
-            />
-          </div>
-          <div class="relative">
-            <lucide-icon [img]="icons.Filter" class="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-400 w-4 h-4"></lucide-icon>
-            <select [(ngModel)]="statusFilter" (ngModelChange)="filterPartners()" class="input w-48 pl-9">
-              <option value="">All Status</option>
-              <option value="Active">Active</option>
-              <option value="Paused">Paused</option>
-              <option value="Inactive">Inactive</option>
-            </select>
-          </div>
-        </div>
-      </div>
+
       
       <!-- Partners Table -->
       <app-data-table
@@ -85,6 +65,14 @@ import { LucideAngularModule, Plus, Search, Filter, X, Mail, Calendar, User, Ext
         [data]="filteredPartners"
         [loading]="loading"
         [showActions]="true"
+        [showFilters]="true"
+        [showExport]="true"
+        [searchQuery]="searchQuery"
+        searchPlaceholder="Search partners by name or email..."
+        [statusFilter]="statusFilter"
+        [statusOptions]="['Active', 'Paused', 'Inactive']"
+        (searchQueryChange)="searchQuery = $event; filterPartners()"
+        (statusFilterChange)="statusFilter = $event; filterPartners()"
         (actionTriggered)="handleAction($event)"
       ></app-data-table>
 
@@ -167,95 +155,155 @@ import { LucideAngularModule, Plus, Search, Filter, X, Mail, Calendar, User, Ext
       
       <!-- Add Partner Modal -->
       <div *ngIf="showAddModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div class="card max-w-md w-full">
-          <h2 class="text-2xl font-bold text-secondary-900 mb-6">Add New Partner</h2>
-          
-          <form (ngSubmit)="addPartner()" class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-secondary-700 mb-2">Partner Name</label>
-              <input type="text" [(ngModel)]="newPartner.name" name="name" required class="input" />
-            </div>
+        <div class="card max-w-md w-full overflow-hidden">
+          <div *ngIf="!showInviteSuccess">
+            <h2 class="text-2xl font-bold text-secondary-900 mb-6">Add New Partner</h2>
             
-            <div>
-              <label class="block text-sm font-medium text-secondary-700 mb-2">Email</label>
-              <input type="email" [(ngModel)]="newPartner.email" name="email" required class="input" />
+            <form (ngSubmit)="addPartner()" class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-secondary-700 mb-2">Partner Name</label>
+                <input type="text" [(ngModel)]="newPartner.name" name="name" required class="input" />
+              </div>
+              
+              <div>
+                <label class="block text-sm font-medium text-secondary-700 mb-2">Email</label>
+                <input type="email" [(ngModel)]="newPartner.email" name="email" required class="input" />
+              </div>
+              
+              <div>
+                <label class="block text-sm font-medium text-secondary-700 mb-2">Status</label>
+                <select [(ngModel)]="newPartner.status" name="status" class="input">
+                  <option value="Active">Active</option>
+                  <option value="Paused">Paused</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+              
+              <div *ngIf="authService.isDemo()" class="p-3 bg-warning/10 border border-warning/20 rounded-lg mb-4">
+                <p class="text-xs text-warning-700 font-medium">
+                  ⚠️ You are in <strong>Demo Mode</strong>. Changes may not be saved to the real database.
+                </p>
+              </div>
+
+              <div *ngIf="errorMessage" class="p-3 bg-danger/10 border border-danger/20 rounded-lg">
+                <p class="text-sm text-danger">{{ errorMessage }}</p>
+              </div>
+              
+              <div class="flex gap-3 pt-4">
+                <button type="submit" [disabled]="submitting" class="btn btn-primary flex-1">
+                  {{ submitting ? 'Adding...' : 'Add Partner' }}
+                </button>
+                <button type="button" (click)="closeAddModal()" class="btn btn-secondary flex-1">Cancel</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Invite Success State -->
+          <div *ngIf="showInviteSuccess" class="py-4">
+            <div class="w-16 h-16 bg-success/10 rounded-full flex items-center justify-center text-success mx-auto mb-6">
+              <lucide-icon [img]="icons.Check" class="w-8 h-8"></lucide-icon>
             </div>
-            
-            <div>
-              <label class="block text-sm font-medium text-secondary-700 mb-2">Status</label>
-              <select [(ngModel)]="newPartner.status" name="status" class="input">
-                <option value="Active">Active</option>
-                <option value="Paused">Paused</option>
-                <option value="Inactive">Inactive</option>
-              </select>
-            </div>
-            
-            <div *ngIf="authService.isDemo()" class="p-3 bg-warning/10 border border-warning/20 rounded-lg mb-4">
-              <p class="text-xs text-warning-700 font-medium">
-                ⚠️ You are in <strong>Demo Mode</strong>. Changes may not be saved to the real database.
-              </p>
+            <h2 class="text-2xl font-bold text-center text-secondary-900 mb-2">Partner Created!</h2>
+            <p class="text-secondary-500 text-center mb-8 px-4">Account created for <strong>{{ lastAddedPartner?.name }}</strong>. Send them the invitation below.</p>
+
+            <div class="bg-secondary-50 p-4 rounded-xl border border-secondary-200 mb-8 relative">
+              <pre class="text-xs text-secondary-700 font-sans whitespace-pre-wrap leading-relaxed">
+Hi {{ lastAddedPartner?.name }}!
+
+Your Partnerly account is ready. 
+Login at: {{ windowLocationOrigin }}/login
+Email: {{ lastAddedPartner?.email }}
+Temp Password: Partner123!</pre>
             </div>
 
-            <div *ngIf="errorMessage" class="p-3 bg-danger/10 border border-danger/20 rounded-lg">
-              <p class="text-sm text-danger">{{ errorMessage }}</p>
-            </div>
-            
-            <div class="flex gap-3 pt-4">
-              <button type="submit" [disabled]="submitting" class="btn btn-primary flex-1">
-                {{ submitting ? 'Adding...' : 'Add Partner' }}
+            <div class="flex flex-col gap-3">
+              <button (click)="copyInviteToClipboard()" 
+                      class="btn btn-primary flex items-center justify-center gap-2 py-3 shadow-lg shadow-primary-200">
+                <lucide-icon [img]="copied ? icons.Check : icons.Clipboard" class="w-5 h-5"></lucide-icon>
+                <span>{{ copied ? 'Invitation Copied!' : 'Copy Invitation Details' }}</span>
               </button>
-              <button type="button" (click)="closeModal()" class="btn btn-secondary flex-1">Cancel</button>
+              <button (click)="closeAddModal()" class="btn btn-secondary py-3">Done</button>
             </div>
-          </form>
+          </div>
         </div>
       </div>
       <!-- Edit Partner Modal -->
       <div *ngIf="showEditModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-[70] p-4">
-        <div class="card max-w-md w-full">
-          <div class="flex items-center justify-between mb-6">
-            <h2 class="text-2xl font-bold text-secondary-900">Edit Partner</h2>
-            <button (click)="showEditModal = false" class="text-secondary-400 hover:text-secondary-600">
-              <lucide-icon [img]="icons.X" class="w-5 h-5"></lucide-icon>
-            </button>
+        <div class="card max-w-md w-full overflow-hidden">
+          <div *ngIf="!showInviteSuccess">
+            <div class="flex items-center justify-between mb-6">
+              <h2 class="text-2xl font-bold text-secondary-900">Edit Partner</h2>
+              <button (click)="closeEditModal()" class="text-secondary-400 hover:text-secondary-600">
+                <lucide-icon [img]="icons.X" class="w-5 h-5"></lucide-icon>
+              </button>
+            </div>
+            
+            <form (ngSubmit)="updatePartner()" class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-secondary-700 mb-2">Partner Name</label>
+                <input type="text" [(ngModel)]="newPartner.name" name="name" required class="input" />
+              </div>
+              
+              <div>
+                <label class="block text-sm font-medium text-secondary-700 mb-2">Email Address</label>
+                <input type="email" [(ngModel)]="newPartner.email" name="email" required class="input" />
+              </div>
+              
+              <div>
+                <label class="block text-sm font-medium text-secondary-700 mb-2">Account Status</label>
+                <select [(ngModel)]="newPartner.status" name="status" class="input">
+                  <option value="Active">Active</option>
+                  <option value="Paused">Paused</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+              
+              <div *ngIf="authService.isDemo()" class="p-3 bg-warning/10 border border-warning/20 rounded-lg">
+                <p class="text-xs text-warning-700 font-medium">
+                  ⚠️ Demo Mode: Changes might not persist.
+                </p>
+              </div>
+
+              <div *ngIf="errorMessage" class="p-3 bg-danger/10 border border-danger/20 rounded-lg">
+                <p class="text-sm text-danger">{{ errorMessage }}</p>
+              </div>
+              
+              <div class="flex gap-3 pt-4">
+                <button type="submit" [disabled]="submitting" class="btn btn-primary flex-1">
+                  {{ submitting ? 'Saving...' : 'Save Changes' }}
+                </button>
+                <button type="button" (click)="closeEditModal()" class="btn btn-secondary flex-1">Cancel</button>
+              </div>
+            </form>
           </div>
-          
-          <form (ngSubmit)="updatePartner()" class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-secondary-700 mb-2">Partner Name</label>
-              <input type="text" [(ngModel)]="newPartner.name" name="name" required class="input" />
+
+          <!-- Invite Success State (Reusable for Edit) -->
+          <div *ngIf="showInviteSuccess" class="py-4">
+            <div class="w-16 h-16 bg-success/10 rounded-full flex items-center justify-center text-success mx-auto mb-6">
+              <lucide-icon [img]="icons.Check" class="w-8 h-8"></lucide-icon>
             </div>
-            
-            <div>
-              <label class="block text-sm font-medium text-secondary-700 mb-2">Email Address</label>
-              <input type="email" [(ngModel)]="newPartner.email" name="email" required class="input" />
-            </div>
-            
-            <div>
-              <label class="block text-sm font-medium text-secondary-700 mb-2">Account Status</label>
-              <select [(ngModel)]="newPartner.status" name="status" class="input">
-                <option value="Active">Active</option>
-                <option value="Paused">Paused</option>
-                <option value="Inactive">Inactive</option>
-              </select>
-            </div>
-            
-            <div *ngIf="authService.isDemo()" class="p-3 bg-warning/10 border border-warning/20 rounded-lg">
-              <p class="text-xs text-warning-700 font-medium">
-                ⚠️ Demo Mode: Changes might not persist.
-              </p>
+            <h2 class="text-2xl font-bold text-center text-secondary-900 mb-2">Partner Updated!</h2>
+            <p class="text-secondary-500 text-center mb-8 px-4">Profile updated for <strong>{{ lastAddedPartner?.name }}</strong>. Send them the invitation below.</p>
+
+            <div class="bg-secondary-50 p-4 rounded-xl border border-secondary-200 mb-8 relative">
+              <pre class="text-xs text-secondary-700 font-sans whitespace-pre-wrap leading-relaxed">
+Hi {{ lastAddedPartner?.name }}!
+
+Your Partnerly account is ready. 
+Login at: {{ windowLocationOrigin }}/login
+Email: {{ lastAddedPartner?.email }}
+Temp Password: Partner123!</pre>
             </div>
 
-            <div *ngIf="errorMessage" class="p-3 bg-danger/10 border border-danger/20 rounded-lg">
-              <p class="text-sm text-danger">{{ errorMessage }}</p>
-            </div>
-            
-            <div class="flex gap-3 pt-4">
-              <button type="submit" [disabled]="submitting" class="btn btn-primary flex-1">
-                {{ submitting ? 'Saving...' : 'Save Changes' }}
+            <div class="flex flex-col gap-3">
+              <button (click)="copyInviteToClipboard()" 
+                      class="btn btn-primary flex items-center justify-center gap-2 py-3 shadow-lg shadow-primary-200">
+                <lucide-icon [img]="copied ? icons.Check : icons.Clipboard" class="w-5 h-5"></lucide-icon>
+                <span>{{ copied ? 'Invitation Copied!' : 'Copy Invitation Details' }}</span>
               </button>
-              <button type="button" (click)="showEditModal = false" class="btn btn-secondary flex-1">Cancel</button>
+              <button (click)="closeEditModal()" class="btn btn-secondary py-3">Done</button>
             </div>
-          </form>
+          </div>
         </div>
       </div>
     </div>
@@ -286,6 +334,11 @@ export class PartnersComponent implements OnInit {
     status: 'Active'
   };
 
+  showInviteSuccess: boolean = false;
+  lastAddedPartner: any = null;
+  copied: boolean = false;
+  windowLocationOrigin = window.location.origin;
+
   readonly icons = {
     Plus,
     Search,
@@ -295,7 +348,9 @@ export class PartnersComponent implements OnInit {
     Calendar,
     User,
     ExternalLink,
-    Trash2
+    Trash2,
+    Clipboard,
+    Check
   };
 
   columns: TableColumn[] = [
@@ -349,7 +404,9 @@ export class PartnersComponent implements OnInit {
     this.submitting = true;
     try {
       await this.partnerService.addPartner(this.newPartner as Omit<Partner, 'id'>);
-      this.closeModal();
+      this.lastAddedPartner = { ...this.newPartner };
+      this.showInviteSuccess = true;
+      this.cdr.detectChanges();
     } catch (error: any) {
       this.errorMessage = error.message || 'Error adding partner';
     } finally {
@@ -383,9 +440,16 @@ export class PartnersComponent implements OnInit {
     this.errorMessage = '';
     this.submitting = true;
     try {
-      await this.partnerService.updatePartner(this.selectedPartner.id, this.newPartner);
-      this.showEditModal = false;
+      // Remove undefined fields to prevent Firestore update errors
+      const cleanedPartner = Object.fromEntries(
+        Object.entries(this.newPartner).filter(([_, v]) => v !== undefined)
+      );
+
+      await this.partnerService.updatePartner(this.selectedPartner.id, cleanedPartner);
+      this.lastAddedPartner = { ...this.newPartner };
+      this.showInviteSuccess = true;
       this.loadPartners(); // Refresh data
+      this.cdr.detectChanges();
     } catch (error: any) {
       this.errorMessage = error.message || 'Error updating partner';
     } finally {
@@ -393,13 +457,48 @@ export class PartnersComponent implements OnInit {
     }
   }
 
-  closeModal() {
+  closeAddModal() {
     this.showAddModal = false;
-    this.cdr.detectChanges();
+    this.showInviteSuccess = false;
+    this.lastAddedPartner = null;
+    this.copied = false;
+    this.resetForm();
+  }
+
+  closeEditModal() {
+    this.showEditModal = false;
+    this.showInviteSuccess = false;
+    this.lastAddedPartner = null;
+    this.copied = false;
+    this.resetForm();
+  }
+
+  resetForm() {
+    this.errorMessage = '';
+    this.selectedPartner = undefined;
     this.newPartner = {
       name: '',
       email: '',
       status: 'Active'
     };
+    this.cdr.detectChanges();
+  }
+
+  copyInviteToClipboard() {
+    const text = `Hi ${this.lastAddedPartner?.name}!
+
+Your Partnerly account is ready. 
+Login at: ${this.windowLocationOrigin}/login
+Email: ${this.lastAddedPartner?.email}
+Temp Password: Partner123!`;
+
+    navigator.clipboard.writeText(text).then(() => {
+      this.copied = true;
+      this.cdr.detectChanges();
+      setTimeout(() => {
+        this.copied = false;
+        this.cdr.detectChanges();
+      }, 3000);
+    });
   }
 }

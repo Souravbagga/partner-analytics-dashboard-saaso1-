@@ -9,8 +9,12 @@ import {
   Megaphone,
   Settings,
   LogOut,
-  TrendingUp
+  TrendingUp,
+  Layout,
+  Wallet,
+  Link
 } from 'lucide-angular';
+import { map, Observable } from 'rxjs';
 
 interface NavItem {
   label: string;
@@ -32,19 +36,21 @@ interface NavItem {
     <div class="min-h-screen bg-secondary-50">
       <!-- Sidebar -->
       <aside class="fixed left-0 top-0 h-full w-64 bg-white border-r border-secondary-200 z-50 flex flex-col">
-        <div class="p-6 border-b border-secondary-200 flex items-center gap-2 shrink-0">
+        <div class="p-6 border-b border-secondary-200 flex items-center gap-2 shrink-0 font-display">
           <lucide-icon [img]="icons.TrendingUp" class="text-primary-600 w-8 h-8"></lucide-icon>
-          <h1 class="text-xl font-bold text-primary-600">Partnerly</h1>
+          <h1 class="text-xl font-bold bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent">Partnerly</h1>
         </div>
         
         <nav class="p-4 flex-1 overflow-y-auto">
-          <a *ngFor="let item of navItems"
-             [routerLink]="item.route"
-             routerLinkActive="bg-primary-50 text-primary-700 border-primary-600 shadow-sm"
-             class="flex items-center gap-3 px-4 py-3 rounded-lg mb-2 text-secondary-600 hover:bg-secondary-50 hover:text-secondary-900 transition-all border-l-4 border-transparent">
-            <lucide-icon [img]="item.icon" class="w-5 h-5"></lucide-icon>
-            <span class="font-medium">{{ item.label }}</span>
-          </a>
+          <ng-container *ngFor="let item of navItems">
+            <a *ngIf="shouldShowItem(item)"
+               [routerLink]="item.route"
+               routerLinkActive="bg-primary-50 text-primary-700 border-primary-600 shadow-sm"
+               class="flex items-center gap-3 px-4 py-3 rounded-lg mb-2 text-secondary-600 hover:bg-secondary-50 hover:text-secondary-900 transition-all border-l-4 border-transparent group">
+              <lucide-icon [img]="item.icon" class="w-5 h-5 group-hover:scale-110 transition-transform"></lucide-icon>
+              <span class="font-medium">{{ item.label }}</span>
+            </a>
+          </ng-container>
         </nav>
 
         <!-- Sidebar Bottom Logout -->
@@ -60,16 +66,22 @@ interface NavItem {
       <!-- Main Content -->
       <div class="ml-64">
         <!-- Top Header -->
-        <header class="bg-white border-b border-secondary-200 px-8 py-4 sticky top-0 z-40">
-          <div class="flex items-center justify-end">
+        <header class="bg-white/80 backdrop-blur-md border-b border-secondary-200 px-8 py-4 sticky top-0 z-40">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+               <span class="text-xs font-bold text-secondary-400 uppercase tracking-widest">{{ pageTitle }}</span>
+            </div>
+
             <div class="flex items-center gap-6">
-              <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full bg-secondary-100 flex items-center justify-center text-secondary-600 font-bold border border-secondary-200">
-                  {{ userInitial }}
+              <div class="flex items-center gap-3 pl-6 border-l border-secondary-100">
+                <div class="text-right hidden md:block">
+                  <p class="text-sm font-bold text-secondary-900 leading-none">{{ userName }}</p>
+                  <p class="text-[10px] font-bold text-primary-600 uppercase tracking-tighter mt-1 px-1.5 py-0.5 bg-primary-50 rounded border border-primary-100">
+                    {{ (authService.currentUserProfile$ | async)?.role || 'User' }}
+                  </p>
                 </div>
-                <div class="text-left hidden md:block">
-                  <p class="text-sm font-semibold text-secondary-900 leading-none">{{ userName }}</p>
-                  <p class="text-xs text-secondary-500 mt-1">Administrator</p>
+                <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-secondary-100 to-white flex items-center justify-center text-primary-600 font-bold border border-secondary-200 shadow-sm">
+                  {{ userInitial }}
                 </div>
               </div>
             </div>
@@ -86,12 +98,14 @@ interface NavItem {
   styles: []
 })
 export class AdminLayoutComponent {
-  private authService = inject(AuthService);
+  public authService = inject(AuthService);
 
   navItems: NavItem[] = [
     { label: 'Dashboard', route: '/dashboard', icon: LayoutDashboard },
     { label: 'Partners', route: '/partners', icon: Users },
     { label: 'Campaigns', route: '/campaigns', icon: Megaphone },
+    { label: 'My Campaigns', route: '/my-campaigns', icon: Link },
+    { label: 'Payouts', route: '/payouts', icon: Wallet },
     { label: 'Settings', route: '/settings', icon: Settings }
   ];
 
@@ -101,8 +115,20 @@ export class AdminLayoutComponent {
     Megaphone,
     Settings,
     LogOut,
-    TrendingUp
+    TrendingUp,
+    Wallet,
+    Link
   };
+
+  currentRole: string = 'User';
+
+  constructor() {
+    this.authService.currentUserProfile$.subscribe(profile => {
+      if (profile) {
+        this.currentRole = profile.role;
+      }
+    });
+  }
 
   get userEmail(): string {
     return this.authService.getCurrentUser()?.email || 'User';
@@ -115,6 +141,29 @@ export class AdminLayoutComponent {
 
   get userInitial(): string {
     return this.userName.charAt(0).toUpperCase();
+  }
+
+  get pageTitle(): string {
+    const segments = window.location.pathname.split('/');
+    const last = segments[segments.length - 1];
+    return last ? last.charAt(0).toUpperCase() + last.slice(1) : 'Overview';
+  }
+
+  shouldShowItem(item: NavItem): boolean {
+    const role = this.currentRole;
+    if (role === 'Admin') {
+      // Admins see everything except Partner-specific "My Campaigns"
+      return item.route !== '/my-campaigns';
+    }
+
+    if (role === 'Partner') {
+      // Partners see specific routes only
+      const partnerRoutes = ['/dashboard', '/my-campaigns', '/payouts', '/settings'];
+      return partnerRoutes.includes(item.route);
+    }
+
+    // Default (Manager, etc.) - Block Partner management
+    return item.route !== '/partners';
   }
 
   logout() {

@@ -8,11 +8,14 @@ import { Partner, Campaign } from '../../../core/models';
 import { LucideAngularModule, ArrowLeft, Mail, Calendar, ExternalLink, Megaphone, TrendingUp, DollarSign, Users } from 'lucide-angular';
 import { DataTableComponent, TableColumn } from '../../../shared/components/data-table/data-table.component';
 import { StatCardComponent } from '../../../shared/components/stat-card/stat-card.component';
+import { AuthService } from '../../../core/services/auth.service';
+import { FormsModule } from '@angular/forms';
+import { Edit2, X } from 'lucide-angular';
 
 @Component({
   selector: 'app-partner-detail',
   standalone: true,
-  imports: [CommonModule, RouterModule, LucideAngularModule, DataTableComponent, StatCardComponent],
+  imports: [CommonModule, RouterModule, LucideAngularModule, DataTableComponent, StatCardComponent, FormsModule],
   animations: [
     trigger('pageEntrance', [
       transition(':enter', [
@@ -28,10 +31,14 @@ import { StatCardComponent } from '../../../shared/components/stat-card/stat-car
         <a routerLink="/partners" class="btn btn-secondary p-2 rounded-lg flex items-center justify-center">
           <lucide-icon [img]="icons.ArrowLeft" class="w-5 h-5"></lucide-icon>
         </a>
-        <div>
+        <div class="flex-1">
           <h1 class="text-3xl font-bold text-secondary-900">{{ partner?.name || 'Partner Details' }}</h1>
           <p class="text-secondary-600 mt-1">Analytics and campaign history for this partner</p>
         </div>
+        <button *ngIf="partner" (click)="openEditModal()" class="btn btn-secondary flex items-center gap-2">
+          <lucide-icon [img]="icons.Edit2" class="w-4 h-4"></lucide-icon>
+          <span>Edit Partner</span>
+        </button>
       </div>
 
       <div *ngIf="loading" class="flex items-center justify-center py-20">
@@ -118,6 +125,56 @@ import { StatCardComponent } from '../../../shared/components/stat-card/stat-car
         <p class="text-secondary-500 mt-2">The partner you are looking for does not exist or has been removed.</p>
         <a routerLink="/partners" class="btn btn-primary mt-6 inline-block">Back to Partners</a>
       </div>
+
+      <!-- Edit Partner Modal -->
+      <div *ngIf="showEditModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-[70] p-4">
+        <div class="card max-w-md w-full">
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-2xl font-bold text-secondary-900">Edit Partner</h2>
+            <button (click)="showEditModal = false" class="text-secondary-400 hover:text-secondary-600">
+              <lucide-icon [img]="icons.X" class="w-5 h-5"></lucide-icon>
+            </button>
+          </div>
+          
+          <form (ngSubmit)="updatePartner()" class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-secondary-700 mb-2">Partner Name</label>
+              <input type="text" [(ngModel)]="editPartnerData.name" name="name" required class="input" />
+            </div>
+            
+            <div>
+              <label class="block text-sm font-medium text-secondary-700 mb-2">Email Address</label>
+              <input type="email" [(ngModel)]="editPartnerData.email" name="email" required class="input" />
+            </div>
+            
+            <div>
+              <label class="block text-sm font-medium text-secondary-700 mb-2">Account Status</label>
+              <select [(ngModel)]="editPartnerData.status" name="status" class="input">
+                <option value="Active">Active</option>
+                <option value="Paused">Paused</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </div>
+            
+            <div *ngIf="authService.isDemo()" class="p-3 bg-warning/10 border border-warning/20 rounded-lg">
+              <p class="text-xs text-warning-700 font-medium">
+                ⚠️ Demo Mode: Changes might not persist.
+              </p>
+            </div>
+
+            <div *ngIf="errorMessage" class="p-3 bg-danger/10 border border-danger/20 rounded-lg">
+              <p class="text-sm text-danger">{{ errorMessage }}</p>
+            </div>
+            
+            <div class="flex gap-3 pt-4">
+              <button type="submit" [disabled]="submitting" class="btn btn-primary flex-1">
+                {{ submitting ? 'Saving...' : 'Save Changes' }}
+              </button>
+              <button type="button" (click)="showEditModal = false" class="btn btn-secondary flex-1">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   `,
   styles: []
@@ -126,11 +183,21 @@ export class PartnerDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private partnerService = inject(PartnerService);
   private campaignService = inject(CampaignService);
+  public authService = inject(AuthService);
   private cdr = inject(ChangeDetectorRef);
 
   partner?: Partner;
   partnerCampaigns: Campaign[] = [];
   loading = true;
+  showEditModal = false;
+  submitting = false;
+  errorMessage = '';
+
+  editPartnerData: Omit<Partner, 'id' | 'createdAt'> = {
+    name: '',
+    email: '',
+    status: 'Active'
+  };
 
   readonly icons = {
     ArrowLeft,
@@ -140,7 +207,9 @@ export class PartnerDetailComponent implements OnInit {
     Megaphone,
     TrendingUp,
     DollarSign,
-    Users
+    Users,
+    Edit2,
+    X
   };
 
   campaignColumns: TableColumn[] = [
@@ -158,6 +227,33 @@ export class PartnerDetailComponent implements OnInit {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.loadData(id);
+    }
+  }
+
+  openEditModal() {
+    if (!this.partner) return;
+    this.editPartnerData = {
+      name: this.partner.name,
+      email: this.partner.email,
+      status: this.partner.status
+    };
+    this.showEditModal = true;
+  }
+
+  async updatePartner() {
+    if (!this.partner?.id) return;
+
+    this.errorMessage = '';
+    this.submitting = true;
+    try {
+      await this.partnerService.updatePartner(this.partner.id, this.editPartnerData);
+      this.showEditModal = false;
+      this.loadData(this.partner.id); // Refresh data
+    } catch (error: any) {
+      this.errorMessage = error.message || 'Error updating partner';
+    } finally {
+      this.submitting = false;
+      this.cdr.detectChanges();
     }
   }
 

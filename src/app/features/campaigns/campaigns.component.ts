@@ -14,6 +14,7 @@ import { RouterModule } from '@angular/router';
   selector: 'app-campaigns',
   standalone: true,
   imports: [CommonModule, FormsModule, RouterModule, DataTableComponent, LucideAngularModule],
+  providers: [],
   animations: [
     trigger('fadeIn', [
       transition(':enter', [
@@ -48,36 +49,16 @@ import { RouterModule } from '@angular/router';
           <h1 class="text-3xl font-bold text-secondary-900">Campaigns</h1>
           <p class="text-secondary-600 mt-1">Track and manage your marketing campaigns</p>
         </div>
-        <button (click)="showAddModal = true" class="btn btn-primary flex items-center gap-2 px-6">
+        <button *ngIf="authService.currentUserProfile$ | async as profile"
+                [hidden]="profile.role === 'Partner'"
+                (click)="showAddModal = true" 
+                class="btn btn-primary flex items-center gap-2 px-6">
           <lucide-icon [img]="icons.Plus" class="w-5 h-5"></lucide-icon>
           <span>New Campaign</span>
         </button>
       </div>
       
-      <!-- Filter Bar -->
-      <div class="card">
-        <div class="flex items-center gap-4">
-          <div class="flex-1 relative">
-            <lucide-icon [img]="icons.Search" class="absolute left-2 top-1/2 -translate-y-1/2 text-secondary-400 w-5 h-5"></lucide-icon>
-            <input
-              type="text"
-              [(ngModel)]="searchQuery"
-              (ngModelChange)="filterCampaigns()"
-              placeholder="Search campaigns..."
-              class="input pl-10"
-            />
-          </div>
-          <div class="relative">
-            <lucide-icon [img]="icons.Filter" class="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-400 w-4 h-4"></lucide-icon>
-            <select [(ngModel)]="statusFilter" (ngModelChange)="filterCampaigns()" class="input w-48 pl-9">
-              <option value="">All Status</option>
-              <option value="Active">Active</option>
-              <option value="Paused">Paused</option>
-              <option value="Completed">Completed</option>
-            </select>
-          </div>
-        </div>
-      </div>
+
       
       <!-- Campaigns Table -->
       <app-data-table
@@ -86,6 +67,14 @@ import { RouterModule } from '@angular/router';
         [data]="filteredCampaigns"
         [loading]="loading"
         [showActions]="true"
+        [showFilters]="true"
+        [showExport]="true"
+        [searchQuery]="searchQuery"
+        searchPlaceholder="Search campaigns..."
+        [statusFilter]="statusFilter"
+        [statusOptions]="['Active', 'Paused', 'Completed']"
+        (searchQueryChange)="searchQuery = $event; filterCampaigns()"
+        (statusFilterChange)="statusFilter = $event; filterCampaigns()"
         (actionTriggered)="handleAction($event)"
       ></app-data-table>
 
@@ -210,19 +199,29 @@ import { RouterModule } from '@angular/router';
             
             <div class="grid grid-cols-2 gap-4">
               <div>
+                <label class="block text-sm font-medium text-secondary-700 mb-2">Platform</label>
+                <select [(ngModel)]="newCampaign.platform" name="platform" class="input">
+                  <option value="Facebook">Facebook</option>
+                  <option value="Google">Google Ads</option>
+                  <option value="Instagram">Instagram</option>
+                  <option value="LinkedIn">LinkedIn</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-secondary-700 mb-2">Budget ($)</label>
+                <input type="number" [(ngModel)]="newCampaign.budget" name="budget" class="input" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div>
                 <label class="block text-sm font-medium text-secondary-700 mb-2">Start Date</label>
                 <input type="date" [(ngModel)]="startDateString" name="startDate" required class="input" />
               </div>
-              
               <div>
                 <label class="block text-sm font-medium text-secondary-700 mb-2">End Date</label>
                 <input type="date" [(ngModel)]="endDateString" name="endDate" required class="input" />
               </div>
-            </div>
-            
-            <div>
-              <label class="block text-sm font-medium text-secondary-700 mb-2">Budget ($)</label>
-              <input type="number" [(ngModel)]="newCampaign.budget" name="budget" class="input" />
             </div>
 
             <div *ngIf="authService.isDemo()" class="p-3 bg-warning/10 border border-warning/20 rounded-lg mb-4">
@@ -239,7 +238,7 @@ import { RouterModule } from '@angular/router';
               <button type="submit" [disabled]="submitting" class="btn btn-primary flex-1">
                 {{ submitting ? 'Creating...' : 'Create Campaign' }}
               </button>
-              <button type="button" (click)="closeModal()" class="btn btn-secondary flex-1">Cancel</button>
+              <button type="button" (click)="closeAddModal()" class="btn btn-secondary flex-1">Cancel</button>
             </div>
           </form>
         </div>
@@ -249,7 +248,7 @@ import { RouterModule } from '@angular/router';
         <div class="card max-w-md w-full max-h-[90vh] overflow-y-auto">
           <div class="flex items-center justify-between mb-6">
             <h2 class="text-2xl font-bold text-secondary-900">Edit Campaign</h2>
-            <button (click)="showEditModal = false" class="text-secondary-400 hover:text-secondary-600">
+            <button (click)="closeEditModal()" class="text-secondary-400 hover:text-secondary-600">
               <lucide-icon [img]="icons.X" class="w-5 h-5"></lucide-icon>
             </button>
           </div>
@@ -280,19 +279,29 @@ import { RouterModule } from '@angular/router';
             
             <div class="grid grid-cols-2 gap-4">
               <div>
+                <label class="block text-sm font-medium text-secondary-700 mb-2">Platform</label>
+                <select [(ngModel)]="newCampaign.platform" name="platform" class="input">
+                  <option value="Facebook">Facebook</option>
+                  <option value="Google">Google Ads</option>
+                  <option value="Instagram">Instagram</option>
+                  <option value="LinkedIn">LinkedIn</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-secondary-700 mb-2">Budget ($)</label>
+                <input type="number" [(ngModel)]="newCampaign.budget" name="budget" class="input" />
+              </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+              <div>
                 <label class="block text-sm font-medium text-secondary-700 mb-2">Start Date</label>
                 <input type="date" [(ngModel)]="startDateString" name="startDate" required class="input" />
               </div>
-              
               <div>
                 <label class="block text-sm font-medium text-secondary-700 mb-2">End Date</label>
                 <input type="date" [(ngModel)]="endDateString" name="endDate" required class="input" />
               </div>
-            </div>
-            
-            <div>
-              <label class="block text-sm font-medium text-secondary-700 mb-2">Budget (\$)</label>
-              <input type="number" [(ngModel)]="newCampaign.budget" name="budget" class="input" />
             </div>
 
             <div *ngIf="authService.isDemo()" class="p-3 bg-warning/10 border border-warning/20 rounded-lg">
@@ -309,7 +318,7 @@ import { RouterModule } from '@angular/router';
               <button type="submit" [disabled]="submitting" class="btn btn-primary flex-1">
                 {{ submitting ? 'Saving...' : 'Save Changes' }}
               </button>
-              <button type="button" (click)="showEditModal = false" class="btn btn-secondary flex-1">Cancel</button>
+              <button type="button" (click)="closeEditModal()" class="btn btn-secondary flex-1">Cancel</button>
             </div>
           </form>
         </div>
@@ -364,11 +373,12 @@ export class CampaignsComponent implements OnInit {
   };
 
   columns: TableColumn[] = [
-    { key: 'name', label: 'Campaign Name' },
+    { key: 'name', label: 'Campaign' },
     { key: 'partnerName', label: 'Partner' },
+    { key: 'platform', label: 'Platform', type: 'badge' },
     { key: 'status', label: 'Status', type: 'badge' },
-    { key: 'startDate', label: 'Start Date', type: 'date' },
-    { key: 'endDate', label: 'End Date', type: 'date' }
+    { key: 'budget', label: 'Budget', type: 'currency' },
+    { key: 'startDate', label: 'Start Date', type: 'date' }
   ];
 
   ngOnInit() {
@@ -441,7 +451,7 @@ export class CampaignsComponent implements OnInit {
       };
 
       await this.campaignService.addCampaign(campaign);
-      this.closeModal();
+      this.closeAddModal();
     } catch (error: any) {
       this.errorMessage = error.message || 'Error adding campaign';
     } finally {
@@ -466,7 +476,10 @@ export class CampaignsComponent implements OnInit {
       status: campaign.status,
       startDate: campaign.startDate,
       endDate: campaign.endDate,
-      budget: campaign.budget
+      budget: campaign.budget,
+      spent: campaign.spent,
+      conversions: campaign.conversions,
+      platform: campaign.platform || 'Facebook'
     };
     this.startDateString = this.formatDateForInput(campaign.startDate);
     this.endDateString = this.formatDateForInput(campaign.endDate);
@@ -491,8 +504,13 @@ export class CampaignsComponent implements OnInit {
         endDate: new Date(this.endDateString)
       };
 
-      await this.campaignService.updateCampaign(this.selectedCampaign.id, campaign);
-      this.showEditModal = false;
+      // Remove undefined fields to prevent Firestore update errors
+      const cleanedCampaign = Object.fromEntries(
+        Object.entries(campaign).filter(([_, v]) => v !== undefined)
+      );
+
+      await this.campaignService.updateCampaign(this.selectedCampaign.id, cleanedCampaign);
+      this.closeEditModal();
       this.loadCampaigns();
     } catch (error: any) {
       this.errorMessage = error.message || 'Error updating campaign';
@@ -501,20 +519,32 @@ export class CampaignsComponent implements OnInit {
     }
   }
 
-  closeModal() {
-    console.log('Setting showAddModal to false (Campaign)');
+  closeAddModal() {
     this.showAddModal = false;
-    this.cdr.detectChanges();
+    this.resetForm();
+  }
+
+  closeEditModal() {
+    this.showEditModal = false;
+    this.resetForm();
+  }
+
+  resetForm() {
     this.errorMessage = '';
+    this.selectedCampaign = undefined;
     this.newCampaign = {
       name: '',
       partnerId: '',
       status: 'Active',
       startDate: new Date(),
       endDate: new Date(),
-      budget: 0
+      budget: 0,
+      spent: 0,
+      conversions: 0,
+      platform: 'Facebook'
     };
     this.startDateString = '';
     this.endDateString = '';
+    this.cdr.detectChanges();
   }
 }

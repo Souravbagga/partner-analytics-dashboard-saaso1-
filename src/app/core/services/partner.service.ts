@@ -1,13 +1,15 @@
 import { Injectable, inject } from '@angular/core';
-import { Firestore, collection, collectionData, addDoc, updateDoc, deleteDoc, doc, query, orderBy, serverTimestamp } from '@angular/fire/firestore';
+import { Firestore, collection, collectionData, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from '@angular/fire/firestore';
 import { Observable, map } from 'rxjs';
 import { Partner } from '../models';
+import { ActivityLogService } from './activity-log.service';
 
 @Injectable({
     providedIn: 'root'
 })
 export class PartnerService {
     private firestore: Firestore = inject(Firestore);
+    private activityLogService = inject(ActivityLogService);
 
     getPartners(): Observable<Partner[]> {
         console.log('Fetching partners from Firestore...');
@@ -26,14 +28,16 @@ export class PartnerService {
         ) as Observable<Partner[]>;
     }
 
-    async addPartner(partner: Omit<Partner, 'id'>): Promise<void> {
+    async addPartner(partner: Omit<Partner, 'id'>): Promise<string> {
         try {
             const partnersCollection = collection(this.firestore, 'partners');
-            await addDoc(partnersCollection, {
+            const docRef = await addDoc(partnersCollection, {
                 ...partner,
-                createdAt: serverTimestamp()
+                createdAt: new Date()
             });
-        } catch (error: any) {
+            await this.activityLogService.logAction(`Created partner: ${partner.name}`, docRef.id, 'Partner');
+            return docRef.id;
+        } catch (error) {
             console.error('Error adding partner:', error);
             throw error;
         }
@@ -43,6 +47,7 @@ export class PartnerService {
         try {
             const partnerDoc = doc(this.firestore, 'partners', id);
             await updateDoc(partnerDoc, partner);
+            await this.activityLogService.logAction(`Updated partner profile`, id, 'Partner');
         } catch (error) {
             console.error('Error updating partner:', error);
             throw error;

@@ -1,3 +1,13 @@
+export type UserRole = 'Admin' | 'Manager' | 'Partner';
+
+export interface UserProfile {
+    uid: string;
+    email: string;
+    role: UserRole;
+    displayName?: string;
+    partnerId?: string;
+}
+
 export interface Partner {
     id?: string;
     name: string;
@@ -19,6 +29,7 @@ export interface Campaign {
     budget?: number;
     spent?: number;
     conversions?: number;
+    platform?: 'Facebook' | 'Google' | 'Instagram' | 'LinkedIn';
 }
 
 export interface Activity {
@@ -30,11 +41,44 @@ export interface Activity {
     type: 'created' | 'updated' | 'completed';
 }
 
+export interface AuditLog {
+    id?: string;
+    userId: string;
+    userEmail: string;
+    action: string;
+    entityId: string;
+    entityType: 'Partner' | 'Campaign' | 'User';
+    timestamp: Date;
+}
+
+export interface ConversionEvent {
+    id?: string;
+    partnerId: string;
+    campaignId: string;
+    revenue: number;
+    commission: number;
+    type: string;
+    timestamp: Date;
+}
+
+export interface PayoutRequest {
+    id?: string;
+    partnerId: string;
+    amount: number;
+    status: 'Pending' | 'Approved' | 'Paid' | 'Rejected';
+    requestedAt: Date;
+    paidAt?: Date;
+}
+
+
 export interface DashboardStats {
     totalPartners: number;
     activeCampaigns: number;
     totalRevenue: number;
     conversions: number;
+    totalCommission: number;
+    pendingCommission: number;
+    availableBalance: number;
 }
 
 export interface ChartData {

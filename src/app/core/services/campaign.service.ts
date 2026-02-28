@@ -2,12 +2,15 @@ import { Injectable, inject } from '@angular/core';
 import { Firestore, collection, collectionData, addDoc, updateDoc, deleteDoc, doc, query, orderBy, Timestamp } from '@angular/fire/firestore';
 import { Observable, map } from 'rxjs';
 import { Campaign } from '../models';
+import { ActivityLogService } from './activity-log.service';
+
 
 @Injectable({
     providedIn: 'root'
 })
 export class CampaignService {
     private firestore: Firestore = inject(Firestore);
+    private activityLogService = inject(ActivityLogService);
 
     getCampaigns(): Observable<Campaign[]> {
         console.log('Fetching campaigns from Firestore...');
@@ -32,11 +35,12 @@ export class CampaignService {
     async addCampaign(campaign: Omit<Campaign, 'id'>): Promise<void> {
         try {
             const campaignsCollection = collection(this.firestore, 'campaigns');
-            await addDoc(campaignsCollection, {
+            const docRef = await addDoc(campaignsCollection, {
                 ...campaign,
                 startDate: campaign.startDate instanceof Date ? campaign.startDate : new Date(campaign.startDate),
                 endDate: campaign.endDate instanceof Date ? campaign.endDate : new Date(campaign.endDate)
             });
+            await this.activityLogService.logAction(`Created campaign: ${campaign.name}`, docRef.id, 'Campaign');
         } catch (error) {
             console.error('Error adding campaign:', error);
             throw error;
@@ -47,6 +51,7 @@ export class CampaignService {
         try {
             const campaignDoc = doc(this.firestore, 'campaigns', id);
             await updateDoc(campaignDoc, campaign);
+            await this.activityLogService.logAction(`Updated campaign: ${campaign.name || 'details'}`, id, 'Campaign');
         } catch (error) {
             console.error('Error updating campaign:', error);
             throw error;
