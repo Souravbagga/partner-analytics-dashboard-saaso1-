@@ -1,27 +1,53 @@
 import { Injectable, inject } from '@angular/core';
 import { Firestore, collection, collectionData, addDoc, query, orderBy, limit, Timestamp, where } from '@angular/fire/firestore';
-import { Observable, map } from 'rxjs';
+import { Observable, map, switchMap, of, catchError } from 'rxjs';
 import { ConversionEvent } from '../models';
+import { AuthService } from './auth.service';
 
 @Injectable({
     providedIn: 'root'
 })
 export class EventService {
     private firestore: Firestore = inject(Firestore);
+    private authService = inject(AuthService);
 
     getRecentEvents(partnerId?: string): Observable<ConversionEvent[]> {
-        const eventsCollection = collection(this.firestore, 'conversion_events');
-        let q = query(eventsCollection, orderBy('timestamp', 'desc'), limit(50));
+        return this.authService.currentUserProfile$.pipe(
+            switchMap(profile => {
+                if (!profile) return of([]);
 
-        if (partnerId) {
-            q = query(eventsCollection, where('partnerId', '==', partnerId), orderBy('timestamp', 'desc'), limit(50));
-        }
+                const eventsCollection = collection(this.firestore, 'conversion_events');
+                let q;
 
-        return collectionData(q, { idField: 'id' }).pipe(
-            map(events => events.map(event => ({
-                ...event,
-                timestamp: (event['timestamp'] as any)?.toDate() || new Date()
-            } as ConversionEvent)))
+                if (profile.role === 'Partner') {
+                    // Partners only see their own events
+                    q = query(
+                        eventsCollection,
+                        where('partnerId', '==', profile.partnerId),
+                        limit(50)
+                    );
+                } else {
+                    // Admins only see events OWNED by them
+                    q = query(
+                        eventsCollection,
+                        where('ownerId', '==', profile.uid),
+                        limit(50)
+                    );
+                }
+
+                return collectionData(q, { idField: 'id' }).pipe(
+                    catchError(err => {
+                        console.warn('Events fetch failed (Demo Mode expected):', err);
+                        return of([]);
+                    }),
+                    map(events => events.map(event => ({
+                        ...event,
+                        timestamp: (event['timestamp'] as any)?.toDate() || new Date()
+                    } as ConversionEvent))),
+                    // Sort in memory to bypass index requirement
+                    map(events => events.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()))
+                );
+            })
         );
     }
 
@@ -29,6 +55,7 @@ export class EventService {
         const eventsCollection = collection(this.firestore, 'conversion_events');
         await addDoc(eventsCollection, {
             ...event,
+            ownerId: event.ownerId || 'demo-admin', // Ensure owner is tracked
             timestamp: Timestamp.fromDate(event.timestamp || new Date())
         });
     }

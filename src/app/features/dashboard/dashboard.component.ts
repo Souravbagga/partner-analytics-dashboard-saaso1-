@@ -485,8 +485,7 @@ export class DashboardComponent implements OnInit {
                     this.activityLogService.getRecentLogs(30).pipe(catchError(() => of([]))),
                     partnerId ? this.payoutService.getPayoutRequests(partnerId).pipe(catchError(() => of([]))) : of([])
                 ]);
-            }),
-            take(1)
+            })
         ).subscribe({
             next: ([partners, campaigns, events, logs, payouts]) => {
                 const isPartner = this.profile?.role === 'Partner';

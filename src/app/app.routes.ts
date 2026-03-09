@@ -59,7 +59,7 @@ export const routes: Routes = [
                 path: 'campaigns',
                 component: CampaignsComponent,
                 canActivate: [roleGuard],
-                data: { roles: ['Admin', 'Manager'] }
+                data: { roles: ['Admin', 'Manager', 'Partner'] }
             },
             {
                 path: 'campaigns/:id',

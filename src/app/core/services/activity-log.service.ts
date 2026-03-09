@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
-import { Firestore, collection, addDoc, query, orderBy, limit, collectionData, Timestamp } from '@angular/fire/firestore';
-import { Observable, map } from 'rxjs';
+import { Firestore, collection, addDoc, query, orderBy, limit, collectionData, Timestamp, where } from '@angular/fire/firestore';
+import { Observable, map, switchMap, of } from 'rxjs';
 import { AuditLog } from '../models';
 import { AuthService } from './auth.service';
 
@@ -15,12 +15,13 @@ export class ActivityLogService {
         const user = this.authService.getCurrentUser();
         if (!user) return;
 
-        const log: Omit<AuditLog, 'id'> = {
+        const log: any = {
             userId: user.uid || 'demo-uid',
             userEmail: user.email || 'unknown',
             action,
             entityId,
             entityType,
+            ownerId: user.uid, // Track for multi-tenancy
             timestamp: new Date()
         };
 
@@ -36,13 +37,26 @@ export class ActivityLogService {
     }
 
     getRecentLogs(maxLogs: number = 20): Observable<AuditLog[]> {
-        const logsCollection = collection(this.firestore, 'audit_logs');
-        const q = query(logsCollection, orderBy('timestamp', 'desc'), limit(maxLogs));
-        return collectionData(q, { idField: 'id' }).pipe(
-            map(logs => logs.map(log => ({
-                ...log,
-                timestamp: (log['timestamp'] as any)?.toDate() || new Date()
-            } as AuditLog)))
+        return this.authService.currentUserProfile$.pipe(
+            switchMap(profile => {
+                if (!profile) return of([]);
+
+                const logsCollection = collection(this.firestore, 'audit_logs');
+                // Filter by ownerId to only see your own logs
+                const q = query(
+                    logsCollection,
+                    where('ownerId', '==', profile.uid),
+                    orderBy('timestamp', 'desc'),
+                    limit(maxLogs)
+                );
+
+                return collectionData(q, { idField: 'id' }).pipe(
+                    map(logs => logs.map(log => ({
+                        ...log,
+                        timestamp: (log['timestamp'] as any)?.toDate() || new Date()
+                    } as AuditLog)))
+                );
+            })
         );
     }
 }

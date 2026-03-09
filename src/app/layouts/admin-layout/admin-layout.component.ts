@@ -124,9 +124,7 @@ export class AdminLayoutComponent {
 
   constructor() {
     this.authService.currentUserProfile$.subscribe(profile => {
-      if (profile) {
-        this.currentRole = profile.role;
-      }
+      this.currentRole = profile?.role || 'User';
     });
   }
 
@@ -158,7 +156,7 @@ export class AdminLayoutComponent {
 
     if (role === 'Partner') {
       // Partners see specific routes only
-      const partnerRoutes = ['/dashboard', '/my-campaigns', '/payouts', '/settings'];
+      const partnerRoutes = ['/dashboard', '/campaigns', '/my-campaigns', '/payouts', '/settings'];
       return partnerRoutes.includes(item.route);
     }
 

@@ -6,6 +6,7 @@ export interface UserProfile {
     role: UserRole;
     displayName?: string;
     partnerId?: string;
+    ownerId?: string;
 }
 
 export interface Partner {
@@ -16,6 +17,7 @@ export interface Partner {
     createdAt: Date;
     revenue?: number;
     campaigns?: number;
+    ownerId?: string;
 }
 
 export interface Campaign {
@@ -30,6 +32,7 @@ export interface Campaign {
     spent?: number;
     conversions?: number;
     platform?: 'Facebook' | 'Google' | 'Instagram' | 'LinkedIn';
+    ownerId?: string;
 }
 
 export interface Activity {
@@ -59,6 +62,7 @@ export interface ConversionEvent {
     commission: number;
     type: string;
     timestamp: Date;
+    ownerId?: string;
 }
 
 export interface PayoutRequest {
@@ -68,6 +72,7 @@ export interface PayoutRequest {
     status: 'Pending' | 'Approved' | 'Paid' | 'Rejected';
     requestedAt: Date;
     paidAt?: Date;
+    ownerId?: string;
 }
 
 

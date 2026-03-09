@@ -1,7 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import { Auth, signInWithEmailAndPassword, signOut, user, User, createUserWithEmailAndPassword } from '@angular/fire/auth';
+import { Firestore, collection, query, where, collectionData } from '@angular/fire/firestore';
 import { Router } from '@angular/router';
-import { Observable, of, switchMap, shareReplay, catchError, BehaviorSubject, combineLatest } from 'rxjs';
+import { Observable, of, switchMap, shareReplay, catchError, BehaviorSubject, combineLatest, take, map } from 'rxjs';
 import { UserProfile } from '../models';
 import { UserService } from './user.service';
 
@@ -19,6 +20,7 @@ export class AuthService {
     private auth: Auth = inject(Auth);
     private router = inject(Router);
     private userService = inject(UserService);
+    private firestore: Firestore = inject(Firestore);
 
     user$: Observable<User | null> = user(this.auth);
 
@@ -35,16 +37,62 @@ export class AuthService {
     ]).pipe(
         switchMap(([user, demoState]) => {
             if (demoState.authenticated) {
+                if (demoState.role === 'Partner') {
+                    const normalizedEmail = demoState.email.toLowerCase().trim();
+                    const partnersCollection = collection(this.firestore, 'partners');
+                    const q = query(partnersCollection, where('email', '==', normalizedEmail));
+
+                    return collectionData(q, { idField: 'id' }).pipe(
+                        map(partners => {
+                            const partner = partners[0] as any;
+                            // For the specific demo email, we provide a fallback ID if not found in Firestore
+                            // to ensure the demo experience is fully functional.
+                            const isDemoEmail = normalizedEmail === 'partner@demo.com';
+                            return {
+                                uid: 'demo-uid',
+                                email: demoState.email,
+                                role: 'Partner',
+                                displayName: demoState.name,
+                                partnerId: partner?.id || (isDemoEmail ? 'demo-partner-id' : undefined),
+                                ownerId: partner?.ownerId || 'demo-admin'
+                            } as UserProfile;
+                        })
+                    );
+                }
+
                 return of({
                     uid: 'demo-uid',
                     email: demoState.email,
                     role: demoState.role,
                     displayName: demoState.name,
-                    partnerId: demoState.role === 'Partner' ? 'demo-partner-id' : undefined
+                    partnerId: undefined,
+                    ownerId: 'demo-uid'
                 } as UserProfile);
             }
             if (user) {
                 return this.userService.getUserProfile(user.uid).pipe(
+                    switchMap(profile => {
+                        if (profile?.role === 'Partner' && !profile.ownerId) {
+                            const normalizedEmail = profile.email.toLowerCase().trim();
+                            const partnersCollection = collection(this.firestore, 'partners');
+                            const q = query(partnersCollection, where('email', '==', normalizedEmail));
+                            return collectionData(q, { idField: 'id' }).pipe(
+                                map(partners => {
+                                    const partner = partners[0] as any;
+                                    return {
+                                        ...profile,
+                                        ownerId: partner?.ownerId,
+                                        partnerId: partner?.id
+                                    } as UserProfile;
+                                })
+                            );
+                        }
+                        // For Admins, ownerId is their own UID
+                        if (profile && profile.role !== 'Partner') {
+                            profile.ownerId = profile.uid;
+                        }
+                        return of(profile);
+                    }),
                     catchError(error => {
                         console.error('Error fetching user profile:', error);
                         return of(null);
@@ -87,7 +135,8 @@ export class AuthService {
             await this.userService.createUserProfile({
                 uid: credential.user.uid,
                 email: email,
-                role: 'Admin'
+                role: 'Admin',
+                ownerId: credential.user.uid // Admins own their own data
             });
             this.router.navigate(['/dashboard']);
         } catch (error) {
@@ -122,7 +171,7 @@ export class AuthService {
 
     getCurrentUser(): User | null {
         if (this.demoStateSubject.value.authenticated) {
-            return { email: this.demoStateSubject.value.email } as User;
+            return { email: this.demoStateSubject.value.email, uid: 'demo-uid' } as User;
         }
         return this.auth.currentUser;
     }
